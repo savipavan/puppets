@@ -1,0 +1,554 @@
+1.2 Introduction to Puppet:
+--------------------------
+1.3 Course Objectives:
+2016.2
+----------------
+1.4 Puppet Head
+----------------
+#vi /etc/hosts
+enter fqdn for our server
+
+#cd /root
+wget https://pm.puppetlabs.com/puppet-enterprise/2016.4.2/puppet-enterprise-2016.4.2-el-7-x86_64.tar.gz
+
+#tar -xvzf puppet-enterprise-2016.4.2-el-7-x86_64.tar.gz
+
+#cd puppet-enterprise-2016.4.2-el-7-x86_64
+
+#./puppet-enterprise-installer
+
+# 1
+
+# https://<pupeptmaster ip>:3000
+
+# click advanced
+
+#Lets get started
+
+# Monolithic
+
+# puppet master fqdn, dns : puppet, master, puppetmaster, console admin password
+
+# continue
+
+# login with GUI
+
+# 502 Gateway problem
+# cd /usr/lib/systemd/system
+# ls | grep "pe-"
+#Stop puppetdb first
+service pe-puppetdb stop
+# stop puppetserver
+service pe-puppetserver stop
+# stop pe-console service
+service pe-console-services.service
+
+#start one by one
+service pe-puppetdb start
+service pe-puppetserver start
+service pe-console-services.service
+
+now we can login to console:
+
+check the pe,conf file
+#cd /etc/puppetlabs/enterprise/conf.d
+#cp pe.conf /root/
+
+#Provisioning the node for puppetmaster
+copy the URL from console and run on agent
+
+#sign the certificate
+on server:
+puppet cert list
+puppet cert list -a
+
+or
+
+on console we can accept the certificate
+
+run puppet agent -t on centos node
+
+#https://forge.puppet.com
+
+#search for ntp
+
+#Install on the node1
+puppet module install puppetlabs-ntp
+
+#cd /etc/puppetlabs/code/environments/production
+
+#cd modules
+
+# cd manifests
+
+vi site.pp
+	include ntp
+:wq!
+
+# run puppet agent on node
+puppet agent -t
+
+# run puppet apply on server
+puppet agent -t
+
+1.5 - Puppet Enterprise Stack and Core concepts:
+----------------
+1.6 puppet nodes:
+------------
+
+
+2.1 Puppet and Selinux:
+-------------
+# cd /etc/selinux/
+
+# vi config
+	SELINUX = enforcing
+	
+	chane the above line to 
+	
+	SELINUX = permissive
+:wq!
+
+# reboot now
+
+2.2 Install puppet enterprise server:
+----------
+- Puppet Enterprise configuration file are installed in
+/etc/puppetlabs/puppet
+
+- Puppet Enterprise software binaries are installed in
+/opt/puppetlabs
+
+- Executable binaries are in
+/opt/puppetlabs/bin and /opt/puppetlabs/sbin.
+
+R10k : /etc/puppetlabs/r10k
+environments: /etc/puppetlabs/code/environments/
+Modules: Main directory for Puppet Modules
+Manifests : Contains the main starting point for catalog compilation
+ssl : Contains each node's certificate infrastrucute
+/etc/puppetlabs/puppet/ssl
+
+2.3 Installing Puppet 2:
+------------
+cat /root/pe.conf
+
+./puppet-enterprise-installer -c /root/pe.conf
+
+when we go to the splitstack
+1. Install puppet master first
+2. Puppet db second
+3. puppet console third
+
+# signing certificates
+# puppet cert list
+# puppet cert list --all
+
+# puppet cert sign node1-centos
+
+# run the agent on node1
+
+then we can see 2 nodes in enterprise console
+
+# cd /etc/puppetlabs/
+
+2.4 puppet.conf
+----------------
+/etc/puppetlabs/puppet
+
+: main
+: agent
+: master
+: user
+
+Basic Settings : Agent
+- ca_server :
+- certname :
+- server :
+- environment :
+
+Run behavior:
+	- noop - agent will not do any work, only simulate changes and report to the master
+	- priority - Sets the nice command so catalog enforcement does not use up CPU
+	- report - determines if reporting is enabled(defaults to true)
+	- usecacheonfailure - Fall back to last known working catalog if convergence fails
+	
+Service behavior:
+	- runinterval : How often puppet agent daemon runs
+	- waitforcert : Keep trying to run puppet agent if the certificate is not initially available.
+	
+configuring settins via the command line:
+puppet config set <SETTING NAME> <VALUE> --section<CONFIG SECTION>
+
+#On puppet master server:
+cat /puppet.conf
+
+#On puppet agent
+cat /etc/puppetlabs/puppet.conf
+
+vi puppet.conf
+rename the certificate:
+:wq!
+
+rm -rf ssl
+
+#on master
+puppet cert list -a
+
+#purge out the agent certificate from the server
+puppet cert clean node1-centos
+
+#on agent run puppet agent -t
+
+#on master run puppet cert list
+#puppet cert sign <update name>
+
+#on agent -t
+
+#update puppet configuration settings
+puppet config set runinterval 2m --section main
+
+#restart the puppet service
+service puppet restart
+
+#check the agent whether it is running with 2m interval
+tail -f /var/log/messages
+
+#if we do any changes in main section in puppet.conf
+#restart puppet server service
+#restart pe-puppetserver.service
+
+3.1 Resource Abstraction Layer:
+-------------------
+Commands:
+	puppet resource [type]
+	puppet resource [type] [name]
+	puppet resource user
+	puppet resource user root
+puppet describe: Provide information about resource types within puppet
+	puppet describe -l (List all resource type available)
+	puppet describe -s  [type]
+	puppet describe [type]
+
+3.2 Using Resource types to create mainifests:
+
+cd /etc/puppetlabs/code/environments/production
+
+cd manifests
+
+vi admin.pp
+	user { 'admin': 
+		ensure => present,
+		home	=> '/home/admin',
+		managehome => true,
+		gid		=> 'wheel',
+		shell	=> '/bin/bash',
+		}
+	:wq!
+	
+# puppet apply admin.pp
+vi admin.pp
+	group { 'admin':
+		ensure => present,
+	}
+	user { 'admin':
+		groups => 'wheel',
+	:wq!
+
+# puppet apply admin.pp
+
+vi notify.pp
+	notify { 'This is a test!!!': }
+	:wq!
+
+# puppet apply notify.pp
+
+vi testfile.pp
+	file { '/home/admin/test_file1.txt":
+		ensure => file,
+		content => "Look at me I'm a file!",
+		mode => '0600',
+		owner => 'admin',
+		group => 'root',
+	}
+# puppet apply testfile.pp
+
+# ls /home/admin
+
+# puppet resource user
+
+vi admin.pp
+	user { 'admin': 
+		ensure => present,
+		password => 'Password123!'
+		home	=> '/home/admin',
+		managehome => true,
+		gid		=> 'wheel',
+		shell	=> '/bin/bash',
+		}
+	:wq!
+	
+# puppet apply testfile.pp
+
+# puppet resource admin
+
+#Encrypt the password for user admin
+#openssl passwd -1
+
+copy the encrypted password for admin and place this in to password cloum in admin.pp
+
+#puppet apply -t
+
+#su admin
+
+#puppet describe package -s
+
+3.3 - Catalog Compilation:
+
+4.1 Certificate Signing Request:
+------------
+Certificate Singing Request:
+	Command:
+		puppet cert
+		puppet cert list
+		puppet cert sign <NAME>
+		puppet cert revoke <NAME>
+		
+	DNS altnames:
+		puppet cert sign (<HOSTNAME> or -all) --allow-dns-alt-names<NAME>
+	
+	Regenerating Certificates:
+		- On puppet master:
+			puppet cert clean <NAME>
+		- Deleting SSL certs on agent:
+			cp -r /etc/puppetlabs/puppet/ssl /etc/puppetlabs/puppet/ssl_bak/
+		
+Autosigning:
+	The CA uses a config file containing a whitelist of certificate names and domain names.
+	-	$confdir/autosign.conf
+	-	*.domain.com
+	To disable autosigning
+	-	autosign = false in the [master] in puppet.conf
+	
+# on puppet master
+clean certficate and accept the certificate request
+
+#stop puppet service in agent
+service puppet stop
+
+#vi puppet.conf
+dns_alt_names = awesome_agent
+
+4.2 Running the Puppet Agent:
+--------
+privision new ubuntu node
+
+puppet master is not configure to handle ubuntu repos
+
+on console --> classfication --> pu master --> claases --> search for pe_repo::platform:ubuntiu --> Add and confirm
+
+#run puppet agent -t on master
+
+# then run the curl url on ubuuntu
+
+#locate the packages in master server:
+cd /opt/puppetlabs/server/data/packages/public
+
+If we get some issues then we can fix this with below solution:
+#on agent
+cd /etc/apt/apt.conf.d/
+vi 90pe-repo-fix
+	APT::Get::AllowUnauthenticated 1;
+:wq!
+
+or 
+
+echo 'APT::Get::AllowUnauthenticated 1;' > /etc/apt/apt.conf.d/90pe-repo-fix
+
+run puppet agent -t
+
+#on master sign certificate
+puppet cert list
+
+puppet cert sign node3-ubuntu
+
+#on console --> classfication --> Add group --> ubuntu --> Add --> Click on Ubuntu --> add certname --> classes
+
+to demonstrate noop
+#service puppet stop
+
+puppet agent --help
+
+#created stage environment in cosole --> created group --> add ubuntu sever
+
+# then provide permissions to pe-puppet on staging folder 
+
+chown pe-puppet:pe-puppet -R stage/
+
+puppet agent -t environment=stage
+
+#check the logs
+cd /var/log/
+
+tail syslog
+
+4.3 using site.pp
+------------
+remove the classfication in console
+
+#uninstall ntp
+apt-get purge ntp
+
+on master:
+go site.pp file
+vi site.pp
+
+node 'node3-ubuntu' {
+	include ntp
+}
+
+:wq!
+
+run puppet agent -t
+
+vi site.pp
+
+node default {
+	notify { "This is the default node!": }
+	}
+
+:wq!
+
+run puppet agent -t
+
+vi site.pp
+
+node /^node3-ubuntu/ {
+	notify { "This is the node definition using regex!": }
+	}
+
+:wq!
+
+#puppet agent -t
+
+vi site.pp
+
+node 'node3-ubuntu','node1-centos' {
+	notify { "multiple nodes were added!": }
+	}
+
+:wq!
+
+#puppet agent -t
+
+5.1 Setting up a github account:
+---------
+Login github
+
+#generate ssh key on puppet master
+ssh-keygen -t rsa -b 4096 "savipavan@gmail.com"
+
+cat /root/.ssh/id_rsa.pub
+
+go setting in github account --> SSH and GPG keys --> paste the key
+
+add new repository
+
+#yum install git
+
+#check our module
+git clone <<>>
+
+5.2 Modules:
+--------
+puppet module generate <maintainer>-<module_name>
+	- The tests directory deprecated
+	- The examples directory has been added
+- Module names contain:
+	- Lowercase letters
+	- Numbers
+	- Underscores
+	- Modules begin with a lowercase letters
+	- Module names cannot contain the namespace separator(::)
+	
+cd /etc/puppetlabs/code/environments/production/modules/
+
+#puppet module generate pavan-ssh
+
+cd ssh/
+
+#git init
+#git add .
+#git commit -am "Init commit"
+#git remote add origin
+#git push origin master
+
+5.3 Classes:
+-----
+on master
+
+cd /etc/puppetlabs/code/environments/production/modules/
+
+vi init.pp
+class ssh {
+	class { 'ssh::install': } ->
+	class { 'ssh::service': }
+}
+
+:wq!
+
+vi install.pp
+class ssh::install {
+	pacakge {'openssh-server':
+		ensure => present,
+	}
+}
+
+:wq!
+
+vi service.pp
+	class ssh::service {
+		service { 'sshd':
+			ensure => running,
+			enable => true,
+			hasstatus => true,
+			hasrestart => true,
+		}
+	}
+:wq!
+
+#validate
+puppet parser validate init.pp
+puppet parser validate install.pp
+puppet parser validate service.pp
+
+#create base group in console. --> add ssh --> pin nodes
+
+#run puppet agent -t on nodes which we pinned
+
+
+5.4 Facter:
+--------
+
+on puppet master:
+
+cd /etc/puppetlabs/code/environments/production/modules/ssh
+
+vi param.pp
+	class ssh::params {
+		case $facts[::osfamily] {
+			'Debian': {
+			
+5.44 time
+
+		
+	
+
+
+
+
+
+
+
+
+
